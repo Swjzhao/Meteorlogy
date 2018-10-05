@@ -1,72 +1,79 @@
 import pandas as pd
 import numpy as np
 import os
+import serial
+import syslog
+import time
 
 from pandas.compat import StringIO, BytesIO
 
 
-
+#The following line is for serial over GPIO
+port = '/dev/ttyACM0'
+ard = serial.Serial(port,9600,timeout=5)
+i = 0
 
 data = pd.read_csv("data.csv", usecols=[2])
 
+#arrays
+dataWGain = []
+width = []
+period = []
+dataIN = []
 
-array1 = data.values
 
-counter = 0
-for j in array1:
-	j = (j-500)* 10000;
+widthCounter = 0
+periodCounter = 0
+isPeriod = 0
+last = 0
+withoutFirstPeriod = 0; #disregard first period (3 changes) 0 > - 500 > 500> -500
 
+while 0 < 1:
+	msg = ard.readline()
+	msg1 = int(msg)
+	dataIN.append(msg1)
+	j = (msg1-500)* 10000
 	if j > 500:
-		array1[counter] = 500;
-	elif j < -500: 
-		array1[counter] = -500;
+		dataWGain.append(1)
+	else: 
+		dataWGain.append(0)
+	
+	if last == msg1:
+		counter+=1
+		deleteFirstPeriod += 1
 	else:
-		array1[counter] = j;
-
-	counter = counter + 1
-
-for j in array1:
-	print(j)
-
-array2 = []
-counter1 = 0
-for i in range(1,len(array1)):
-	if array1[i] == array1[i-1] and array1[i] != 0:
-		counter1 = counter1 + 1
-	elif array1[i] == 0:
-		continue
-	else:
-		array2.append(counter1)
-		counter1 = 0
-
-array3 = []
-a = False
-for i in range(2,len(array2)-2):
-	
-	if(a):
-		a = False
-		continue	
-	
-	if(array2[i] != 0):
-		array3.append(array2[i] + array2[i+1])
-		a = True
-	
+		width.append(counter)
+		counter = 0
+		if (withoutFirstPeriod > 1):
+			isPeriod += 1
+		
+			
+	if withoutFirstPeriod > 1:
+		if isPeriod:	
+			period.append(width[periodCounter] + width[periodCounter-1])
+			print period[len(period)-1]
+			isPeriod = 0
+			
+	last = msg1
 
 
 
 
-for i in range(len(array1) - len(array2)):
-	array2.append(0)
-for i in range(len(array1) - len(array3)):
-	array3.append(0)
-array1 = array1.ravel()
-#array3 = np.array(array2)
-#array3 = array3.ravel()
-for j in array1:
-	print(j)
-#np.savetxt("test.csv", array1, delimiter=",")
 
-df = pd.DataFrame({"Data" : array1, "Counter" : array2, "Col3" : array3})
+
+#for i in range(len(array1) - len(array2)):
+#	array2.append(0)
+#for i in range(len(array1) - len(array3)):
+#	array3.append(0)
+#array1 = array1.ravel()
+for j in len(range(dataWGain) - range(width)):
+	width.append(0)
+
+
+for j in len(range(dataWGain) - range(period)):
+	width.append(0)
+
+df = pd.DataFrame({"Data" : dataWGain, "Width" : width, "Period" : period})
 df.to_csv("test.csv", index=False)
 
 
